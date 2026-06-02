@@ -364,8 +364,7 @@ function loadCSVData() {
           else if (lk === 'score1') obj.score1 = (row[k]||'').trim();
           else if (lk === 'team2') obj.team2 = (row[k]||'').trim();
           else if (lk === 'score2') obj.score2 = (row[k]||'').trim();
-          else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();
-        }
+          else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();            else if (lk === 'datetime') obj.datetime = (row[k]||'').trim();        }
         return obj;
       }).filter(m => m.team1 && m.team2);
       renderGroups();
@@ -472,16 +471,18 @@ function renderGroups() {
       for (const [t1, t2] of fixtures) {
         const s = findScore(letter, t1, t2);
         let s1 = '-', s2 = '-', scoreCls = '', statusBadge = '';
+        let dateBadge = '';
         if (s) {
           const flipped = s.team1 === t2; // CSV might have teams in reverse order
           s1 = flipped ? s.score2 : s.score1;
           s2 = flipped ? s.score1 : s.score2;
           if (s1 !== '' && s2 !== '' && s1 !== '-' && s2 !== '-') scoreCls = ' has-score';
           if (s.status === 'live') { scoreCls = ' live'; statusBadge = '<span class="text-[9px] text-yellow-400 font-bold ml-1">LIVE</span>'; }
+          if (s.status === 'scheduled' && s.datetime) { dateBadge = `<div class="text-[9px] text-gray-500 text-center mt-0.5">${s.datetime}</div>`; }
         }
         html += `<div class="match-row">
           <div class="team"><img src="${flagUrl(t1)}" class="w-4 h-3 rounded object-cover" alt=""><span>${t1}</span></div>
-          <div class="score-box${scoreCls}">${s1} – ${s2}${statusBadge}</div>
+          <div><div class="score-box${scoreCls}">${s1} – ${s2}${statusBadge}</div>${dateBadge}</div>
           <div class="team right"><span>${t2}</span><img src="${flagUrl(t2)}" class="w-4 h-3 rounded object-cover" alt=""></div>
         </div>`;
       }

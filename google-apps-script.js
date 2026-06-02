@@ -28,14 +28,14 @@
  */
 
 // ===== CONFIGURATION =====
-const COMPETITION = 'WC';   // football-data.org code for FIFA World Cup
-const UPDATE_INTERVAL = 10; // minutes between auto-updates
+var COMPETITION = 'WC';   // football-data.org code for FIFA World Cup
+var UPDATE_INTERVAL = 10; // minutes between auto-updates
 
 // API team names → our team names (only where they differ)
-const TEAM_NAME_MAP = {
+var TEAM_NAME_MAP = {
   'Korea Republic':          'South Korea',
   "Côte d'Ivoire":           'Ivory Coast',
-  'Cote d\'Ivoire':          'Ivory Coast',
+  "Cote d'Ivoire":           'Ivory Coast',
   'Türkiye':                 'Turkey',
   'Czechia':                 'Czech Republic',
   'Congo DR':                'DR Congo',
@@ -96,7 +96,13 @@ function onOpen() {
     .addItem('▶ Initial Setup', 'setup')
     .addItem('🔄 Update Now', 'updateScores')
     .addItem('⏱ Check Trigger Status', 'showTriggerStatus')
+    .addItem('🧪 Test Script', 'testScript')
     .addToUi();
+}
+
+/** Run this first to verify the script is working */
+function testScript() {
+  SpreadsheetApp.getUi().alert('✅ Script is working! Now run "setup" from the dropdown.');
 }
 
 // ===== SHEET TAB CREATION =====
@@ -106,11 +112,11 @@ function createSheetTabs_() {
   // ── GroupMatches ──
   let gm = ss.getSheetByName('GroupMatches');
   if (!gm) gm = ss.insertSheet('GroupMatches');
-  const gmH = ['Group', 'Team1', 'Score1', 'Team2', 'Score2', 'Status'];
+  var gmH = ['Group', 'Team1', 'Score1', 'Team2', 'Score2', 'Status', 'DateTime'];
   gm.getRange(1, 1, 1, gmH.length).setValues([gmH])
     .setFontWeight('bold').setBackground('#005a9c').setFontColor('#fff');
   gm.setFrozenRows(1);
-  [70, 200, 70, 200, 70, 100].forEach((w, i) => gm.setColumnWidth(i + 1, w));
+  [70, 200, 70, 200, 70, 100, 160].forEach(function(w, i) { gm.setColumnWidth(i + 1, w); });
 
   // ── KnockoutResults ──
   let kr = ss.getSheetByName('KnockoutResults');
@@ -222,15 +228,22 @@ function writeGroupMatches_(matches) {
     }
     // SCHEDULED, TIMED, POSTPONED → leave as Scheduled with no scores
 
-    return [group, team1, score1, team2, score2, status];
+    // Convert UTC date to Israel time (Asia/Jerusalem)
+    var dateTime = '';
+    if (m.utcDate) {
+      var d = new Date(m.utcDate);
+      dateTime = Utilities.formatDate(d, 'Asia/Jerusalem', 'dd/MM HH:mm');
+    }
+
+    return [group, team1, score1, team2, score2, status, dateTime];
   });
 
   // Write everything (overwrite below header)
   if (rows.length > 0) {
     // Clear old data
-    const lastRow = Math.max(sheet.getLastRow(), 1);
-    if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
-    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 7).clearContent();
+    sheet.getRange(2, 1, rows.length, 7).setValues(rows);
   }
 }
 
