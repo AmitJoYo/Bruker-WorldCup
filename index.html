@@ -44,8 +44,18 @@ body{font-family:'Inter',sans-serif;background:#0d1520}
 .pulse{animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 
+/* === GROUP MATCHES === */
+.match-row{display:flex;align-items:center;gap:4px;padding:6px 8px;font-size:11px;border-bottom:1px solid rgba(51,65,85,.4)}
+.match-row:last-child{border-bottom:none}
+.match-row .team{display:flex;align-items:center;gap:5px;flex:1;min-width:0}
+.match-row .team span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.match-row .team.right{flex-direction:row-reverse;text-align:right}
+.match-row .score-box{min-width:46px;text-align:center;font-weight:700;font-size:12px;padding:2px 6px;border-radius:4px;background:rgba(15,23,42,.5);color:#9ca3af;letter-spacing:1px}
+.match-row .score-box.has-score{color:#e2e8f0;background:rgba(0,90,156,.25)}
+.match-row .score-box.live{color:#facc15;background:rgba(234,179,8,.15);animation:pulse 2s infinite}
+
 /* === BRACKET === */
-.bracket{display:flex;align-items:stretch;gap:0;min-width:1100px;height:580px}
+.bracket{display:flex;align-items:stretch;gap:0;min-width:820px;height:380px}
 .bracket .round{display:flex;flex-direction:column;justify-content:space-around;width:145px;flex-shrink:0;position:relative;z-index:1}
 .bracket .round-spacer{width:24px;flex-shrink:0}
 .bracket .match{background:rgba(30,41,59,.7);border:1px solid #334155;border-radius:6px;overflow:hidden;position:relative}
@@ -114,13 +124,22 @@ body{font-family:'Inter',sans-serif;background:#0d1520}
 <!-- Groups Tab -->
 <section id="tab-groups" class="fade-in">
   <h2 class="text-2xl font-bold mb-4"><i class="fas fa-globe-americas text-bruker-accent mr-2"></i>Groups A — L</h2>
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <select id="group-filter" class="bg-slate-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition" onchange="renderGroups()">
+      <option value="">All Groups</option>
+    </select>
+    <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer select-none">
+      <input type="checkbox" id="show-matches" class="accent-bruker-accent" onchange="renderGroups()" checked>
+      Show Matches
+    </label>
+  </div>
   <div id="groups-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
 </section>
 
 <!-- Bracket Tab -->
 <section id="tab-bracket" class="hidden fade-in">
   <h2 class="text-2xl font-bold mb-4"><i class="fas fa-sitemap text-bruker-accent mr-2"></i>Knockout Bracket</h2>
-  <p class="text-sm text-gray-400 mb-3"><i class="fas fa-info-circle mr-1"></i>Results update automatically from the Results CSV configured in Setup.</p>
+  <div id="bracket-info" class="text-sm text-gray-400 mb-3 bg-slate-800/40 rounded-lg px-4 py-2 border border-gray-700/50 inline-block"></div>
   <div class="overflow-x-auto pb-4">
     <div id="bracket-root" class="bracket"></div>
   </div>
@@ -194,7 +213,13 @@ body{font-family:'Inter',sans-serif;background:#0d1520}
         <input id="cfg-guesses" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
       </div>
       <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
-        <label class="block text-sm font-medium text-gray-300 mb-1">Official Results CSV (Published Google Sheet)</label>
+        <label class="block text-sm font-medium text-gray-300 mb-1">Group Matches CSV (Published Google Sheet)</label>
+        <p class="text-xs text-gray-500 mb-2">Columns: <code class="text-bruker-accent">Group, Team1, Score1, Team2, Score2</code> — optional: <code class="text-bruker-accent">Status</code> (Scheduled / Live / Finished)</p>
+        <input id="cfg-matches" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
+      </div>
+      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
+        <label class="block text-sm font-medium text-gray-300 mb-1">Knockout Results CSV (Published Google Sheet)</label>
+        <p class="text-xs text-gray-500 mb-2">Columns: <code class="text-bruker-accent">StageKey, TeamName</code> — Keys: m1–m8 (R16 winners), q1–q4, sf1–sf2, winner</p>
         <input id="cfg-results" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
       </div>
       <button onclick="saveConfig()" class="w-full bg-bruker hover:bg-bruker-light text-white font-semibold py-2.5 rounded-lg transition"><i class="fas fa-save mr-2"></i>Save Configuration</button>
@@ -274,6 +299,7 @@ const BRACKET_STRUCT = {
 
 // ===== STATE =====
 let realResults = {};
+let groupScores = []; // [{group,team1,score1,team2,score2,status}]
 let employees = [];
 let popChart = null;
 
@@ -305,23 +331,34 @@ function switchTab(id) {
 function loadConfig() {
   document.getElementById('cfg-form').value = localStorage.getItem('bwc_form')||'';
   document.getElementById('cfg-guesses').value = localStorage.getItem('bwc_guesses')||'';
+  document.getElementById('cfg-matches').value = localStorage.getItem('bwc_matches')||'';
   document.getElementById('cfg-results').value = localStorage.getItem('bwc_results')||'';
+  // populate group filter dropdown
+  const sel = document.getElementById('group-filter');
+  Object.keys(GROUPS).forEach(g => {
+    const o = document.createElement('option');
+    o.value = g; o.textContent = 'Group ' + g;
+    sel.appendChild(o);
+  });
   updateFormEmbed();
 }
 
 function saveConfig() {
   const form = document.getElementById('cfg-form').value.trim();
   const guesses = document.getElementById('cfg-guesses').value.trim();
+  const matches = document.getElementById('cfg-matches').value.trim();
   const results = document.getElementById('cfg-results').value.trim();
 
   // Basic URL validation
   const urlPattern = /^https?:\/\//;
   if (form && !urlPattern.test(form)) { toast('Invalid Form URL','error'); return; }
   if (guesses && !urlPattern.test(guesses)) { toast('Invalid Guesses CSV URL','error'); return; }
+  if (matches && !urlPattern.test(matches)) { toast('Invalid Matches CSV URL','error'); return; }
   if (results && !urlPattern.test(results)) { toast('Invalid Results CSV URL','error'); return; }
 
   localStorage.setItem('bwc_form', form);
   localStorage.setItem('bwc_guesses', guesses);
+  localStorage.setItem('bwc_matches', matches);
   localStorage.setItem('bwc_results', results);
   toast('Configuration saved!');
   updateFormEmbed();
@@ -386,6 +423,34 @@ function loadCSVData() {
     employees = [];
   }
 
+  // Group Matches CSV
+  const matchesUrl = localStorage.getItem('bwc_matches');
+  if (matchesUrl) {
+    Papa.parse(matchesUrl, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: r => {
+        groupScores = r.data.map(row => {
+          const obj = {};
+          for (const k of Object.keys(row)) {
+            const lk = k.trim().toLowerCase();
+            if (lk === 'group') obj.group = (row[k]||'').trim().toUpperCase();
+            else if (lk === 'team1') obj.team1 = (row[k]||'').trim();
+            else if (lk === 'score1') obj.score1 = (row[k]||'').trim();
+            else if (lk === 'team2') obj.team2 = (row[k]||'').trim();
+            else if (lk === 'score2') obj.score2 = (row[k]||'').trim();
+            else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();
+          }
+          return obj;
+        }).filter(m => m.team1 && m.team2);
+        renderGroups();
+      },
+      error: () => { groupScores = []; }
+    });
+  } else {
+    groupScores = [];
+  }
+
+  // Knockout Results CSV
   if (resultsUrl) {
     Papa.parse(resultsUrl, {
       download: true, header: true, skipEmptyLines: true,
@@ -441,13 +506,33 @@ function calcScore(pick, results) {
 }
 
 // ===== GROUPS RENDER =====
+function generateGroupFixtures(teams) {
+  const fixtures = [];
+  for (let i = 0; i < teams.length; i++)
+    for (let j = i + 1; j < teams.length; j++)
+      fixtures.push([teams[i], teams[j]]);
+  return fixtures;
+}
+
+function findScore(group, t1, t2) {
+  return groupScores.find(s =>
+    s.group === group &&
+    ((s.team1 === t1 && s.team2 === t2) || (s.team1 === t2 && s.team2 === t1))
+  );
+}
+
 function renderGroups() {
   const grid = document.getElementById('groups-grid');
+  const filterGroup = document.getElementById('group-filter')?.value || '';
+  const showMatches = document.getElementById('show-matches')?.checked ?? true;
   grid.innerHTML = '';
   for (const [letter, teams] of Object.entries(GROUPS)) {
+    if (filterGroup && filterGroup !== letter) continue;
     const card = document.createElement('div');
     card.className = 'card-hover bg-slate-800/60 rounded-xl border border-gray-700 overflow-hidden';
-    card.innerHTML = `
+
+    // Team standings area
+    let html = `
       <div class="bg-gradient-to-r from-bruker/20 to-transparent px-4 py-2 border-b border-gray-700">
         <span class="font-bold text-bruker-accent">Group ${letter}</span>
       </div>
@@ -458,8 +543,33 @@ function renderGroups() {
             <span class="text-sm font-medium">${t}</span>
           </div>
         `).join('')}
-      </div>
-    `;
+      </div>`;
+
+    // Match fixtures
+    if (showMatches) {
+      const fixtures = generateGroupFixtures(teams);
+      html += `<div class="border-t border-gray-700">
+        <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider bg-slate-900/40">Matches</div>`;
+      for (const [t1, t2] of fixtures) {
+        const s = findScore(letter, t1, t2);
+        let s1 = '-', s2 = '-', scoreCls = '', statusBadge = '';
+        if (s) {
+          const flipped = s.team1 === t2; // CSV might have teams in reverse order
+          s1 = flipped ? s.score2 : s.score1;
+          s2 = flipped ? s.score1 : s.score2;
+          if (s1 !== '' && s2 !== '' && s1 !== '-' && s2 !== '-') scoreCls = ' has-score';
+          if (s.status === 'live') { scoreCls = ' live'; statusBadge = '<span class="text-[9px] text-yellow-400 font-bold ml-1">LIVE</span>'; }
+        }
+        html += `<div class="match-row">
+          <div class="team"><img src="${flagUrl(t1)}" class="w-4 h-3 rounded object-cover" alt=""><span>${t1}</span></div>
+          <div class="score-box${scoreCls}">${s1} – ${s2}${statusBadge}</div>
+          <div class="team right"><span>${t2}</span><img src="${flagUrl(t2)}" class="w-4 h-3 rounded object-cover" alt=""></div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    card.innerHTML = html;
     grid.appendChild(card);
   }
 }
@@ -468,6 +578,17 @@ function renderGroups() {
 function renderBracket() {
   const res = getActiveResults();
   const root = document.getElementById('bracket-root');
+  const info = document.getElementById('bracket-info');
+
+  // Info bar: show data source status
+  const resultsUrl = localStorage.getItem('bwc_results');
+  if (!resultsUrl) {
+    info.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>No Knockout Results CSV configured — go to <strong>Setup</strong> to add one. All results will show TBD.';
+  } else if (Object.keys(res).length === 0) {
+    info.innerHTML = '<i class="fas fa-clock text-gray-500 mr-1"></i>Results CSV configured but no data yet — tournament starts June 11.';
+  } else {
+    info.innerHTML = '<i class="fas fa-check-circle text-green-400 mr-1"></i>Showing live results from your Google Sheet. Refresh the page to fetch latest.';
+  }
 
   function slot(team) {
     const t = team || null;
@@ -477,36 +598,18 @@ function renderBracket() {
   }
 
   function match(label, teamA, teamB) {
-    const slots = teamB !== undefined
-      ? slot(teamA) + slot(teamB)
-      : slot(teamA);
-    return `<div class="match"><div class="match-label">${label}</div>${slots}</div>`;
+    return `<div class="match"><div class="match-label">${label}</div>${slot(teamA)}${slot(teamB)}</div>`;
   }
 
   function conn(n, dir) {
     return `<div class="conn conn-${dir}">${'<div class="wire"></div>'.repeat(n)}</div>`;
   }
 
-  function hline(dir) {
-    const side = dir === 'r' ? 'border-top:2px solid #475569;' : 'border-top:2px solid #475569;';
-    return `<div style="display:flex;flex-direction:column;justify-content:center;width:20px;flex-shrink:0"><div style="height:0;${side}"></div></div>`;
+  function hline() {
+    return `<div style="display:flex;flex-direction:column;justify-content:center;width:20px;flex-shrink:0"><div style="height:0;border-top:2px solid #475569"></div></div>`;
   }
 
-  // R16: 4 match cards per side, each shows one R16 winner
-  const r16L = [
-    match('R16 · 49', res.m1||null, undefined),
-    match('R16 · 50', res.m2||null, undefined),
-    match('R16 · 51', res.m3||null, undefined),
-    match('R16 · 52', res.m4||null, undefined)
-  ];
-  const r16R = [
-    match('R16 · 53', res.m5||null, undefined),
-    match('R16 · 54', res.m6||null, undefined),
-    match('R16 · 55', res.m7||null, undefined),
-    match('R16 · 56', res.m8||null, undefined)
-  ];
-
-  // QF: pairs of R16 winners meet
+  // QF: pairs of R16 winners (m1 vs m2, m3 vs m4, etc.)
   const qfL = [
     match('QF · 57', res.m1||null, res.m2||null),
     match('QF · 58', res.m3||null, res.m4||null)
@@ -520,32 +623,28 @@ function renderBracket() {
   const sfL = [match('SF · 61', res.q1||null, res.q2||null)];
   const sfR = [match('SF · 62', res.q3||null, res.q4||null)];
 
-  const finalTeamA = res.sf1||null, finalTeamB = res.sf2||null;
+  // Final + Champion
   const w = res.winner||null;
-  const finalMatch = match('FINAL', finalTeamA, finalTeamB);
+  const finalMatch = match('FINAL', res.sf1||null, res.sf2||null);
   const champion = `<div class="champion ${w?'won':''}">
     <div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">World Champion</div>
     ${w ? `<img src="${flagUrl(w,80)}" class="flag-lg" alt="${w}"><div class="name">${w}</div><div class="crown">🏆</div>` : '<div class="crown" style="opacity:.3">🏆</div><div class="text-gray-600 text-xs italic">TBD</div>'}
   </div>`;
 
   root.innerHTML = `
-    <div class="round">${r16L.join('')}</div>
-    ${conn(4,'r')}
     <div class="round">${qfL.join('')}</div>
     ${conn(2,'r')}
     <div class="round">${sfL.join('')}</div>
-    ${hline('r')}
-    <div class="round round-final" style="width:160px;justify-content:center">
+    ${hline()}
+    <div class="round" style="width:160px;justify-content:center">
       ${finalMatch}
       <div style="height:12px"></div>
       ${champion}
     </div>
-    ${hline('l')}
+    ${hline()}
     <div class="round">${sfR.join('')}</div>
     ${conn(2,'l')}
     <div class="round">${qfR.join('')}</div>
-    ${conn(4,'l')}
-    <div class="round">${r16R.join('')}</div>
   `;
 }
 
