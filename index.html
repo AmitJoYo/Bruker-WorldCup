@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bruker World Cup 2026 — Guessing Game</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bruker: { DEFAULT:'#005a9c', dark:'#003d6b', light:'#0078d4', accent:'#00b4d8' },
+        slate: { 850:'#1a2332', 950:'#0d1520' }
+      },
+      fontFamily: { sans:['Inter','system-ui','sans-serif'] }
+    }
+  }
+}
+</script>
+<style>
+*{scrollbar-width:thin;scrollbar-color:#005a9c #1a2332}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#1a2332}
+::-webkit-scrollbar-thumb{background:#005a9c;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#0078d4}
+body{font-family:'Inter',sans-serif;background:#0d1520}
+.tab-btn.active{color:#00b4d8;border-color:#00b4d8}
+.card-hover{transition:all .25s cubic-bezier(.4,0,.2,1)}
+.card-hover:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,90,156,.3)}
+.flag-img{transition:transform .2s}
+.flag-img:hover{transform:scale(1.1)}
+.fade-in{animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.toast{animation:slideDown .3s ease,fadeIn .3s ease reverse 2.5s forwards}
+.bracket-line{border-color:#334155}
+.slot-winner{background:rgba(0,180,216,.1);border-color:#00b4d8}
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* === BRACKET === */
+.bracket{display:flex;align-items:stretch;gap:0;min-width:1100px;height:580px}
+.bracket .round{display:flex;flex-direction:column;justify-content:space-around;width:145px;flex-shrink:0;position:relative;z-index:1}
+.bracket .round-spacer{width:24px;flex-shrink:0}
+.bracket .match{background:rgba(30,41,59,.7);border:1px solid #334155;border-radius:6px;overflow:hidden;position:relative}
+.bracket .match .slot{display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:11px;font-weight:500;border-bottom:1px solid #1e293b;transition:all .15s}
+.bracket .match .slot:last-child{border-bottom:none}
+.bracket .match .slot.tbd{color:#4b5563;font-style:italic}
+.bracket .match .slot .flag{width:18px;height:12px;border-radius:2px;object-fit:cover}
+.bracket .match-label{font-size:9px;color:#6b7280;font-weight:600;padding:3px 8px;background:rgba(15,23,42,.5);letter-spacing:.5px;text-transform:uppercase}
+
+/* Bracket connector lines */
+.bracket .conn{display:flex;flex-direction:column;width:22px;flex-shrink:0;position:relative}
+.bracket .conn .wire{flex:1;position:relative}
+.bracket .conn .wire::before,.bracket .conn .wire::after{content:'';position:absolute}
+/* Right-facing connectors: horizontal arm + vertical on right */
+.bracket .conn-r .wire::after{left:0;right:0;top:50%;height:0;border-top:2px solid #475569}
+.bracket .conn-r .wire:nth-child(odd)::before{right:0;top:50%;bottom:0;width:0;border-right:2px solid #475569}
+.bracket .conn-r .wire:nth-child(even)::before{right:0;top:0;bottom:50%;width:0;border-right:2px solid #475569}
+/* Left-facing connectors: horizontal arm + vertical on left */
+.bracket .conn-l .wire::after{left:0;right:0;top:50%;height:0;border-top:2px solid #475569}
+.bracket .conn-l .wire:nth-child(odd)::before{left:0;top:50%;bottom:0;width:0;border-left:2px solid #475569}
+.bracket .conn-l .wire:nth-child(even)::before{left:0;top:0;bottom:50%;width:0;border-left:2px solid #475569}
+
+.bracket .champion{text-align:center;padding:16px 8px;border:2px solid #334155;border-radius:10px;background:rgba(30,41,59,.5)}
+.bracket .champion.won{border-color:#eab308;background:rgba(234,179,8,.05)}
+.bracket .champion .crown{font-size:28px}
+.bracket .champion .name{font-size:15px;font-weight:700;color:#facc15}
+.bracket .champion .flag-lg{width:48px;height:32px;border-radius:4px;object-fit:cover;margin:4px auto}
+</style>
+</head>
+<body class="bg-slate-950 text-gray-100 min-h-screen">
+
+<!-- Toast Container -->
+<div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+<!-- Header -->
+<header class="bg-gradient-to-r from-slate-950 via-bruker-dark to-slate-950 border-b border-bruker/30 shadow-lg shadow-bruker/10">
+  <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-bruker flex items-center justify-center font-black text-white text-lg">B</div>
+      <div>
+        <h1 class="text-xl font-bold bg-gradient-to-r from-white to-bruker-accent bg-clip-text text-transparent">Bruker World Cup 2026</h1>
+        <p class="text-xs text-gray-400">Corporate Guessing Game — <span class="text-bruker-accent">USA • Mexico • Canada</span></p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-gray-500">
+      <i class="fas fa-futbol text-bruker-accent animate-spin" style="animation-duration:4s"></i>
+      <span class="hidden sm:inline">June 11 — July 19, 2026</span>
+    </div>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="bg-slate-950/80 backdrop-blur border-b border-gray-800 sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+    <button onclick="switchTab('groups')" class="tab-btn active px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="groups"><i class="fas fa-layer-group mr-1.5"></i>Houses</button>
+    <button onclick="switchTab('bracket')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="bracket"><i class="fas fa-sitemap mr-1.5"></i>Bracket</button>
+    <button onclick="switchTab('submit')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="submit"><i class="fas fa-paper-plane mr-1.5"></i>Submit</button>
+    <button onclick="switchTab('leaderboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="leaderboard"><i class="fas fa-trophy mr-1.5"></i>Leaderboard</button>
+    <button onclick="switchTab('setup')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="setup"><i class="fas fa-cog mr-1.5"></i>Setup</button>
+  </div>
+</nav>
+
+<!-- Content -->
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+<!-- Groups Tab -->
+<section id="tab-groups" class="fade-in">
+  <h2 class="text-2xl font-bold mb-4"><i class="fas fa-globe-americas text-bruker-accent mr-2"></i>Groups A — L</h2>
+  <div id="groups-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+</section>
+
+<!-- Bracket Tab -->
+<section id="tab-bracket" class="hidden fade-in">
+  <h2 class="text-2xl font-bold mb-4"><i class="fas fa-sitemap text-bruker-accent mr-2"></i>Knockout Bracket</h2>
+  <p class="text-sm text-gray-400 mb-3"><i class="fas fa-info-circle mr-1"></i>Results update automatically from the Results CSV configured in Setup.</p>
+  <div class="overflow-x-auto pb-4">
+    <div id="bracket-root" class="bracket"></div>
+  </div>
+</section>
+
+<!-- Submit Tab -->
+<section id="tab-submit" class="hidden fade-in">
+  <div class="max-w-2xl mx-auto">
+    <div class="bg-slate-800/60 rounded-xl p-6 border border-gray-700 mb-6">
+      <h2 class="text-xl font-bold mb-3"><i class="fas fa-clipboard-list text-bruker-accent mr-2"></i>How It Works</h2>
+      <div class="space-y-2 text-sm text-gray-300">
+        <p><i class="fas fa-check-circle text-green-400 mr-2"></i>Pick <strong>ONE team</strong> you think will win the World Cup 2026.</p>
+        <p><i class="fas fa-check-circle text-green-400 mr-2"></i>Points are awarded based on how far your team goes:</p>
+        <div class="grid grid-cols-2 gap-2 ml-6 mt-2">
+          <div class="bg-slate-700/50 rounded-lg px-3 py-2"><span class="text-yellow-400 font-bold">🏆 100 pts</span> — World Cup Winner</div>
+          <div class="bg-slate-700/50 rounded-lg px-3 py-2"><span class="text-gray-300 font-bold">🥈 50 pts</span> — Runner-Up</div>
+          <div class="bg-slate-700/50 rounded-lg px-3 py-2"><span class="text-orange-400 font-bold">🥉 25 pts</span> — Semifinals</div>
+          <div class="bg-slate-700/50 rounded-lg px-3 py-2"><span class="text-blue-400 font-bold">💪 10 pts</span> — Quarterfinals</div>
+        </div>
+        <p class="mt-2 text-gray-400"><i class="fas fa-info-circle mr-1"></i>Eliminated before quarterfinals = 0 points.</p>
+      </div>
+    </div>
+    <div id="form-container" class="bg-slate-800/40 rounded-xl border border-gray-700 overflow-hidden">
+      <div id="form-placeholder" class="p-12 text-center text-gray-500">
+        <i class="fas fa-link text-4xl mb-3 block"></i>
+        <p class="text-lg font-medium">No Google Form configured yet</p>
+        <p class="text-sm mt-1">Go to <strong>Setup</strong> tab to paste your Google Form embed URL.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Leaderboard Tab -->
+<section id="tab-leaderboard" class="hidden fade-in">
+  <h2 class="text-2xl font-bold mb-4"><i class="fas fa-trophy text-bruker-accent mr-2"></i>Leaderboard</h2>
+  <div class="flex flex-wrap gap-3 mb-4">
+    <div class="relative flex-1 min-w-[200px]">
+      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+      <input id="search-input" type="text" placeholder="Search employee..." class="w-full bg-slate-800 border border-gray-700 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition" oninput="renderLeaderboard()">
+    </div>
+    <select id="dept-filter" class="bg-slate-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition" onchange="renderLeaderboard()">
+      <option value="">All Departments</option>
+      <option>R&D</option><option>Sales</option><option>Support</option><option>Finance</option><option>HR</option>
+    </select>
+  </div>
+  <div class="overflow-x-auto rounded-xl border border-gray-700">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-800 text-gray-400">
+        <tr><th class="px-4 py-3 text-left">#</th><th class="px-4 py-3 text-left">Employee</th><th class="px-4 py-3 text-left">Dept</th><th class="px-4 py-3 text-left">Champion Pick</th><th class="px-4 py-3 text-left">Status</th><th class="px-4 py-3 text-right">Score</th></tr>
+      </thead>
+      <tbody id="lb-body" class="divide-y divide-gray-800"></tbody>
+    </table>
+  </div>
+  <h3 class="text-lg font-bold mt-8 mb-3"><i class="fas fa-chart-bar text-bruker-accent mr-2"></i>Most Popular Predictions</h3>
+  <div class="bg-slate-800/60 rounded-xl border border-gray-700 p-4" style="max-height:350px">
+    <canvas id="pop-chart"></canvas>
+  </div>
+</section>
+
+<!-- Setup Tab -->
+<section id="tab-setup" class="hidden fade-in">
+  <div class="max-w-xl mx-auto space-y-6">
+    <h2 class="text-2xl font-bold"><i class="fas fa-cog text-bruker-accent mr-2"></i>Admin Setup</h2>
+    <div class="space-y-4">
+      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
+        <label class="block text-sm font-medium text-gray-300 mb-1">Google Form Embed URL</label>
+        <input id="cfg-form" type="url" placeholder="https://docs.google.com/forms/d/e/.../viewform?embedded=true" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
+      </div>
+      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
+        <label class="block text-sm font-medium text-gray-300 mb-1">Employee Guesses CSV (Published Google Sheet)</label>
+        <input id="cfg-guesses" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
+      </div>
+      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
+        <label class="block text-sm font-medium text-gray-300 mb-1">Official Results CSV (Published Google Sheet)</label>
+        <input id="cfg-results" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
+      </div>
+      <button onclick="saveConfig()" class="w-full bg-bruker hover:bg-bruker-light text-white font-semibold py-2.5 rounded-lg transition"><i class="fas fa-save mr-2"></i>Save Configuration</button>
+      <p class="text-xs text-gray-500 text-center">Settings are saved in your browser's localStorage.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="border-t border-gray-800 mt-12 py-4 text-center text-xs text-gray-600">
+  Bruker World Cup 2026 Guessing Game — Built with <i class="fas fa-heart text-red-500"></i> for Bruker employees
+</footer>
+
+<script>
+// ===== DATA =====
+const GROUPS = {
+  A:['Mexico','South Africa','South Korea','Czech Republic'],
+  B:['Canada','Bosnia and Herzegovina','Qatar','Switzerland'],
+  C:['Brazil','Morocco','Haiti','Scotland'],
+  D:['United States','Paraguay','Australia','Turkey'],
+  E:['Germany','Curaçao','Ivory Coast','Ecuador'],
+  F:['Netherlands','Japan','Sweden','Tunisia'],
+  G:['Belgium','Egypt','Iran','New Zealand'],
+  H:['Spain','Cape Verde','Saudi Arabia','Uruguay'],
+  I:['France','Senegal','Iraq','Norway'],
+  J:['Argentina','Algeria','Austria','Jordan'],
+  K:['Portugal','DR Congo','Uzbekistan','Colombia'],
+  L:['England','Croatia','Ghana','Panama']
+};
+
+const FLAG_MAP = {
+  'Mexico':'mx','South Africa':'za','South Korea':'kr','Czech Republic':'cz',
+  'Canada':'ca','Bosnia and Herzegovina':'ba','Qatar':'qa','Switzerland':'ch',
+  'Brazil':'br','Morocco':'ma','Haiti':'ht','Scotland':'gb-sct',
+  'United States':'us','Paraguay':'py','Australia':'au','Turkey':'tr',
+  'Germany':'de','Curaçao':'cw','Ivory Coast':'ci','Ecuador':'ec',
+  'Netherlands':'nl','Japan':'jp','Sweden':'se','Tunisia':'tn',
+  'Belgium':'be','Egypt':'eg','Iran':'ir','New Zealand':'nz',
+  'Spain':'es','Cape Verde':'cv','Saudi Arabia':'sa','Uruguay':'uy',
+  'France':'fr','Senegal':'sn','Iraq':'iq','Norway':'no',
+  'Argentina':'ar','Algeria':'dz','Austria':'at','Jordan':'jo',
+  'Portugal':'pt','DR Congo':'cd','Uzbekistan':'uz','Colombia':'co',
+  'England':'gb-eng','Croatia':'hr','Ghana':'gh','Panama':'pa'
+};
+
+function flagUrl(country, size=40) {
+  const code = FLAG_MAP[country];
+  if (!code) return '';
+  return `https://flagcdn.com/${size === 40 ? 'w40' : 'w80'}/${code}.png`;
+}
+
+// Bracket structure: R16 match keys feed into QF, SF, Final
+const BRACKET_STRUCT = {
+  r16: [
+    {key:'m1',label:'Match 89'},
+    {key:'m2',label:'Match 90'},
+    {key:'m3',label:'Match 91'},
+    {key:'m4',label:'Match 92'},
+    {key:'m5',label:'Match 93'},
+    {key:'m6',label:'Match 94'},
+    {key:'m7',label:'Match 95'},
+    {key:'m8',label:'Match 96'}
+  ],
+  qf: [
+    {key:'q1',from:['m1','m2']},
+    {key:'q2',from:['m3','m4']},
+    {key:'q3',from:['m5','m6']},
+    {key:'q4',from:['m7','m8']}
+  ],
+  sf: [
+    {key:'sf1',from:['q1','q2']},
+    {key:'sf2',from:['q3','q4']}
+  ],
+  final: {key:'winner',from:['sf1','sf2']}
+};
+
+// ===== STATE =====
+let realResults = {};
+let employees = [];
+let popChart = null;
+
+// ===== UTILS =====
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `toast px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg ${type==='success'?'bg-green-600':'bg-red-600'} text-white`;
+  el.innerHTML = `<i class="fas fa-${type==='success'?'check-circle':'exclamation-circle'} mr-2"></i>${msg}`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(()=>el.remove(), 3000);
+}
+
+function sanitizePick(raw) {
+  if (!raw) return '';
+  // Strip flag emojis (regional indicator symbols and other non-letter prefixes)
+  return raw.replace(/[\u{1F1E0}-\u{1F1FF}]/gu,'').replace(/^[^a-zA-Z]+/,'').trim();
+}
+
+function switchTab(id) {
+  document.querySelectorAll('[id^="tab-"]').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('tab-'+id).classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab===id);
+  });
+  if (id==='leaderboard') renderLeaderboard();
+}
+
+// ===== CONFIG =====
+function loadConfig() {
+  document.getElementById('cfg-form').value = localStorage.getItem('bwc_form')||'';
+  document.getElementById('cfg-guesses').value = localStorage.getItem('bwc_guesses')||'';
+  document.getElementById('cfg-results').value = localStorage.getItem('bwc_results')||'';
+  updateFormEmbed();
+}
+
+function saveConfig() {
+  const form = document.getElementById('cfg-form').value.trim();
+  const guesses = document.getElementById('cfg-guesses').value.trim();
+  const results = document.getElementById('cfg-results').value.trim();
+
+  // Basic URL validation
+  const urlPattern = /^https?:\/\//;
+  if (form && !urlPattern.test(form)) { toast('Invalid Form URL','error'); return; }
+  if (guesses && !urlPattern.test(guesses)) { toast('Invalid Guesses CSV URL','error'); return; }
+  if (results && !urlPattern.test(results)) { toast('Invalid Results CSV URL','error'); return; }
+
+  localStorage.setItem('bwc_form', form);
+  localStorage.setItem('bwc_guesses', guesses);
+  localStorage.setItem('bwc_results', results);
+  toast('Configuration saved!');
+  updateFormEmbed();
+  loadCSVData();
+}
+
+const DEFAULT_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSd4DvC69yk6Rn8sd5r3QbfELDlQXtve32LgZmJDVui9uAMFsg/viewform?embedded=true';
+
+function updateFormEmbed() {
+  const url = localStorage.getItem('bwc_form') || DEFAULT_FORM_URL;
+  const container = document.getElementById('form-container');
+  if (url) {
+    if (!url.includes('docs.google.com/forms')) {
+      container.innerHTML = `<div id="form-placeholder" class="p-12 text-center text-gray-500"><i class="fas fa-exclamation-triangle text-4xl mb-3 block text-yellow-500"></i><p>URL doesn't appear to be a Google Form</p></div>`;
+      return;
+    }
+    container.innerHTML = `<iframe src="${encodeURI(url)}" width="100%" height="3015" frameborder="0" marginheight="0" marginwidth="0" class="bg-white rounded-b-xl">Loading…</iframe>`;
+  }
+}
+
+// ===== CSV LOADING =====
+const DEFAULT_GUESSES_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSRTjdA_AfuoG2SanAA7eeIgV0okELU5mUMaoF9VDxBh395Q9b7D8ec9hjtlNk0QTjxSldG090F8WgA/pub?output=csv';
+
+// Column name matchers — maps your Google Form headers to internal keys
+function classifyColumn(header) {
+  const h = header.trim().toLowerCase();
+  if (h === 'name' || h.includes('full name') || h.includes('your name')) return 'Name';
+  if (h === 'department' || h.includes('department')) return 'Department';
+  if (h === 'championpick' || h.includes('champion') || h.includes('predict')) return 'ChampionPick';
+  return null;
+}
+
+function loadCSVData() {
+  const guessesUrl = localStorage.getItem('bwc_guesses') || DEFAULT_GUESSES_URL;
+  const resultsUrl = localStorage.getItem('bwc_results');
+
+  if (guessesUrl) {
+    Papa.parse(guessesUrl, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: r => {
+        // Build column mapping from actual headers
+        const colMap = {};
+        if (r.meta && r.meta.fields) {
+          for (const f of r.meta.fields) {
+            const mapped = classifyColumn(f);
+            if (mapped) colMap[f] = mapped;
+          }
+        }
+        employees = r.data.map(row => {
+          const obj = {};
+          for (const [rawCol, key] of Object.entries(colMap)) {
+            const val = (row[rawCol]||'').trim();
+            obj[key] = key === 'ChampionPick' ? sanitizePick(val) : val;
+          }
+          return obj;
+        }).filter(e => e.Name);
+        renderLeaderboard();
+      },
+      error: () => { employees = []; renderLeaderboard(); }
+    });
+  } else {
+    employees = [];
+  }
+
+  if (resultsUrl) {
+    Papa.parse(resultsUrl, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: r => {
+        realResults = {};
+        r.data.forEach(row => {
+          let sk='', tn='';
+          for (const k of Object.keys(row)) {
+            const lk = k.trim().toLowerCase();
+            if (lk==='stagekey') sk = row[k].trim().toLowerCase();
+            else if (lk==='teamname') tn = row[k].trim();
+          }
+          if (sk && tn) realResults[sk] = tn;
+        });
+        renderBracket();
+        renderLeaderboard();
+      },
+      error: () => { realResults = {}; renderBracket(); }
+    });
+  } else {
+    realResults = {};
+  }
+}
+
+// ===== POINTS =====
+function getActiveResults() {
+  return realResults;
+}
+
+function calcScore(pick, results) {
+  if (!pick) return {score:0, status:'❌ No Pick'};
+  if (results.winner === pick) return {score:100, status:'🏆 Champion Pick'};
+  // Runner-up = loser of the final = whichever sf winner isn't the winner
+  const finalists = [results.sf1, results.sf2].filter(Boolean);
+  if (results.winner && finalists.includes(pick) && results.winner !== pick) return {score:50, status:'🥈 Finals Qualifier'};
+  // Semifinalists
+  const sfTeams = [results.q1,results.q2,results.q3,results.q4].filter(Boolean);
+  if (sfTeams.includes(pick)) {
+    // Check if they made it to sf but aren't in final
+    if (!finalists.includes(pick)) return {score:25, status:'🥉 Semifinalist'};
+  }
+  // Quarterfinalists
+  const qfTeams = [results.m1,results.m2,results.m3,results.m4,results.m5,results.m6,results.m7,results.m8].filter(Boolean);
+  if (qfTeams.includes(pick)) {
+    if (!sfTeams.includes(pick)) return {score:10, status:'💪 Quarterfinalist'};
+  }
+  // Check if team is even in the tournament
+  const allTeams = Object.values(GROUPS).flat();
+  if (!allTeams.includes(pick)) return {score:0, status:'❓ Unknown Team'};
+  // If no results yet, show pending
+  if (Object.keys(results).length === 0) return {score:0, status:'⏳ Pending'};
+  return {score:0, status:'❌ Eliminated'};
+}
+
+// ===== GROUPS RENDER =====
+function renderGroups() {
+  const grid = document.getElementById('groups-grid');
+  grid.innerHTML = '';
+  for (const [letter, teams] of Object.entries(GROUPS)) {
+    const card = document.createElement('div');
+    card.className = 'card-hover bg-slate-800/60 rounded-xl border border-gray-700 overflow-hidden';
+    card.innerHTML = `
+      <div class="bg-gradient-to-r from-bruker/20 to-transparent px-4 py-2 border-b border-gray-700">
+        <span class="font-bold text-bruker-accent">Group ${letter}</span>
+      </div>
+      <div class="p-3 space-y-2">
+        ${teams.map(t => `
+          <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-700/50 transition">
+            <img src="${flagUrl(t)}" alt="${t}" class="flag-img w-8 h-5 object-cover rounded shadow" loading="lazy">
+            <span class="text-sm font-medium">${t}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+// ===== BRACKET =====
+function renderBracket() {
+  const res = getActiveResults();
+  const root = document.getElementById('bracket-root');
+
+  function slot(team) {
+    const t = team || null;
+    const isTBD = !t;
+    let cls = 'slot' + (isTBD ? ' tbd' : '');
+    return `<div class="${cls}">${!isTBD ? `<img src="${flagUrl(t)}" class="flag" alt="">` : ''}<span>${t||'TBD'}</span></div>`;
+  }
+
+  function match(label, teamA, teamB) {
+    const slots = teamB !== undefined
+      ? slot(teamA) + slot(teamB)
+      : slot(teamA);
+    return `<div class="match"><div class="match-label">${label}</div>${slots}</div>`;
+  }
+
+  function conn(n, dir) {
+    return `<div class="conn conn-${dir}">${'<div class="wire"></div>'.repeat(n)}</div>`;
+  }
+
+  function hline(dir) {
+    const side = dir === 'r' ? 'border-top:2px solid #475569;' : 'border-top:2px solid #475569;';
+    return `<div style="display:flex;flex-direction:column;justify-content:center;width:20px;flex-shrink:0"><div style="height:0;${side}"></div></div>`;
+  }
+
+  // R16: 4 match cards per side, each shows one R16 winner
+  const r16L = [
+    match('R16 · 49', res.m1||null, undefined),
+    match('R16 · 50', res.m2||null, undefined),
+    match('R16 · 51', res.m3||null, undefined),
+    match('R16 · 52', res.m4||null, undefined)
+  ];
+  const r16R = [
+    match('R16 · 53', res.m5||null, undefined),
+    match('R16 · 54', res.m6||null, undefined),
+    match('R16 · 55', res.m7||null, undefined),
+    match('R16 · 56', res.m8||null, undefined)
+  ];
+
+  // QF: pairs of R16 winners meet
+  const qfL = [
+    match('QF · 57', res.m1||null, res.m2||null),
+    match('QF · 58', res.m3||null, res.m4||null)
+  ];
+  const qfR = [
+    match('QF · 59', res.m5||null, res.m6||null),
+    match('QF · 60', res.m7||null, res.m8||null)
+  ];
+
+  // SF: pairs of QF winners
+  const sfL = [match('SF · 61', res.q1||null, res.q2||null)];
+  const sfR = [match('SF · 62', res.q3||null, res.q4||null)];
+
+  const finalTeamA = res.sf1||null, finalTeamB = res.sf2||null;
+  const w = res.winner||null;
+  const finalMatch = match('FINAL', finalTeamA, finalTeamB);
+  const champion = `<div class="champion ${w?'won':''}">
+    <div class="text-[9px] text-gray-500 uppercase tracking-widest mb-1">World Champion</div>
+    ${w ? `<img src="${flagUrl(w,80)}" class="flag-lg" alt="${w}"><div class="name">${w}</div><div class="crown">🏆</div>` : '<div class="crown" style="opacity:.3">🏆</div><div class="text-gray-600 text-xs italic">TBD</div>'}
+  </div>`;
+
+  root.innerHTML = `
+    <div class="round">${r16L.join('')}</div>
+    ${conn(4,'r')}
+    <div class="round">${qfL.join('')}</div>
+    ${conn(2,'r')}
+    <div class="round">${sfL.join('')}</div>
+    ${hline('r')}
+    <div class="round round-final" style="width:160px;justify-content:center">
+      ${finalMatch}
+      <div style="height:12px"></div>
+      ${champion}
+    </div>
+    ${hline('l')}
+    <div class="round">${sfR.join('')}</div>
+    ${conn(2,'l')}
+    <div class="round">${qfR.join('')}</div>
+    ${conn(4,'l')}
+    <div class="round">${r16R.join('')}</div>
+  `;
+}
+
+// ===== LEADERBOARD =====
+function renderLeaderboard() {
+  const res = getActiveResults();
+  const search = (document.getElementById('search-input')?.value||'').toLowerCase();
+  const dept = document.getElementById('dept-filter')?.value||'';
+
+  let data = employees.map(e => {
+    const {score, status} = calcScore(e.ChampionPick, res);
+    return {...e, score, status};
+  });
+
+  data.sort((a,b) => b.score - a.score || a.Name.localeCompare(b.Name));
+
+  if (search) data = data.filter(e => e.Name.toLowerCase().includes(search));
+  if (dept) data = data.filter(e => e.Department === dept);
+
+  const tbody = document.getElementById('lb-body');
+  if (!tbody) return;
+  tbody.innerHTML = data.map((e, i) => {
+    const fc = FLAG_MAP[e.ChampionPick] ? `<img src="${flagUrl(e.ChampionPick)}" class="w-5 h-3.5 rounded object-cover inline mr-1" alt="">` : '';
+    const scoreColor = e.score >= 100 ? 'text-yellow-400' : e.score >= 50 ? 'text-gray-300' : e.score >= 25 ? 'text-orange-400' : e.score >= 10 ? 'text-blue-400' : 'text-gray-500';
+    return `<tr class="hover:bg-slate-800/50 transition">
+      <td class="px-4 py-2.5 text-gray-500">${i+1}</td>
+      <td class="px-4 py-2.5 font-medium">${e.Name}</td>
+      <td class="px-4 py-2.5 text-gray-400">${e.Department}</td>
+      <td class="px-4 py-2.5">${fc}${e.ChampionPick}</td>
+      <td class="px-4 py-2.5 text-xs">${e.status}</td>
+      <td class="px-4 py-2.5 text-right font-bold ${scoreColor}">${e.score}</td>
+    </tr>`;
+  }).join('');
+
+  renderPopChart();
+}
+
+function renderPopChart() {
+  const counts = {};
+  employees.forEach(e => {
+    if (e.ChampionPick) counts[e.ChampionPick] = (counts[e.ChampionPick]||0) + 1;
+  });
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const canvas = document.getElementById('pop-chart');
+  if (!canvas) return;
+
+  if (popChart) popChart.destroy();
+  popChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(s=>s[0]),
+      datasets: [{
+        label: 'Picks',
+        data: sorted.map(s=>s[1]),
+        backgroundColor: 'rgba(0,180,216,0.6)',
+        borderColor: 'rgba(0,180,216,1)',
+        borderWidth: 1, borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: '#9ca3af', stepSize: 1 }, grid: { color: '#1f2937' } },
+        x: { ticks: { color: '#9ca3af' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadConfig();
+  renderGroups();
+  loadCSVData();
+  setTimeout(() => { renderBracket(); renderLeaderboard(); }, 500);
+});
+</script>
+</body>
+</html>
