@@ -114,7 +114,6 @@ body{font-family:'Inter',sans-serif;background:#0d1520}
     <button onclick="switchTab('bracket')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="bracket"><i class="fas fa-sitemap mr-1.5"></i>Bracket</button>
     <button onclick="switchTab('submit')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="submit"><i class="fas fa-paper-plane mr-1.5"></i>Submit</button>
     <button onclick="switchTab('leaderboard')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="leaderboard"><i class="fas fa-trophy mr-1.5"></i>Leaderboard</button>
-    <button onclick="switchTab('setup')" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent whitespace-nowrap hover:text-bruker-accent transition" data-tab="setup"><i class="fas fa-cog mr-1.5"></i>Setup</button>
   </div>
 </nav>
 
@@ -163,11 +162,6 @@ body{font-family:'Inter',sans-serif;background:#0d1520}
       </div>
     </div>
     <div id="form-container" class="bg-slate-800/40 rounded-xl border border-gray-700 overflow-hidden">
-      <div id="form-placeholder" class="p-12 text-center text-gray-500">
-        <i class="fas fa-link text-4xl mb-3 block"></i>
-        <p class="text-lg font-medium">No Google Form configured yet</p>
-        <p class="text-sm mt-1">Go to <strong>Setup</strong> tab to paste your Google Form embed URL.</p>
-      </div>
     </div>
   </div>
 </section>
@@ -199,34 +193,7 @@ body{font-family:'Inter',sans-serif;background:#0d1520}
   </div>
 </section>
 
-<!-- Setup Tab -->
-<section id="tab-setup" class="hidden fade-in">
-  <div class="max-w-xl mx-auto space-y-6">
-    <h2 class="text-2xl font-bold"><i class="fas fa-cog text-bruker-accent mr-2"></i>Admin Setup</h2>
-    <div class="space-y-4">
-      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
-        <label class="block text-sm font-medium text-gray-300 mb-1">Google Form Embed URL</label>
-        <input id="cfg-form" type="url" placeholder="https://docs.google.com/forms/d/e/.../viewform?embedded=true" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
-      </div>
-      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
-        <label class="block text-sm font-medium text-gray-300 mb-1">Employee Guesses CSV (Published Google Sheet)</label>
-        <input id="cfg-guesses" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
-      </div>
-      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
-        <label class="block text-sm font-medium text-gray-300 mb-1">Group Matches CSV (Published Google Sheet)</label>
-        <p class="text-xs text-gray-500 mb-2">Columns: <code class="text-bruker-accent">Group, Team1, Score1, Team2, Score2</code> — optional: <code class="text-bruker-accent">Status</code> (Scheduled / Live / Finished)</p>
-        <input id="cfg-matches" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
-      </div>
-      <div class="bg-slate-800/60 rounded-xl p-5 border border-gray-700">
-        <label class="block text-sm font-medium text-gray-300 mb-1">Knockout Results CSV (Published Google Sheet)</label>
-        <p class="text-xs text-gray-500 mb-2">Columns: <code class="text-bruker-accent">StageKey, TeamName</code> — Keys: m1–m8 (R16 winners), q1–q4, sf1–sf2, winner</p>
-        <input id="cfg-results" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="w-full bg-slate-900 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-bruker-accent transition">
-      </div>
-      <button onclick="saveConfig()" class="w-full bg-bruker hover:bg-bruker-light text-white font-semibold py-2.5 rounded-lg transition"><i class="fas fa-save mr-2"></i>Save Configuration</button>
-      <p class="text-xs text-gray-500 text-center">Settings are saved in your browser's localStorage.</p>
-    </div>
-  </div>
-</section>
+
 
 </main>
 
@@ -297,6 +264,14 @@ const BRACKET_STRUCT = {
   final: {key:'winner',from:['sf1','sf2']}
 };
 
+// ===== CONSTANTS =====
+const SHEET_ID = '1zVoXUcy-17ctpic7e75rXhJ23XhLG2YKi1PbDtGeJME';
+const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSd4DvC69yk6Rn8sd5r3QbfELDlQXtve32LgZmJDVui9uAMFsg/viewform?embedded=true';
+const GUESSES_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Form%20Responses%201`;
+const MATCHES_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=GroupMatches`;
+const RESULTS_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=KnockoutResults`;
+const REFRESH_MS = 3 * 60 * 1000; // Auto-refresh every 3 minutes
+
 // ===== STATE =====
 let realResults = {};
 let groupScores = []; // [{group,team1,score1,team2,score2,status}]
@@ -329,10 +304,6 @@ function switchTab(id) {
 
 // ===== CONFIG =====
 function loadConfig() {
-  document.getElementById('cfg-form').value = localStorage.getItem('bwc_form')||'';
-  document.getElementById('cfg-guesses').value = localStorage.getItem('bwc_guesses')||'';
-  document.getElementById('cfg-matches').value = localStorage.getItem('bwc_matches')||'';
-  document.getElementById('cfg-results').value = localStorage.getItem('bwc_results')||'';
   // populate group filter dropdown
   const sel = document.getElementById('group-filter');
   Object.keys(GROUPS).forEach(g => {
@@ -340,48 +311,12 @@ function loadConfig() {
     o.value = g; o.textContent = 'Group ' + g;
     sel.appendChild(o);
   });
-  updateFormEmbed();
-}
-
-function saveConfig() {
-  const form = document.getElementById('cfg-form').value.trim();
-  const guesses = document.getElementById('cfg-guesses').value.trim();
-  const matches = document.getElementById('cfg-matches').value.trim();
-  const results = document.getElementById('cfg-results').value.trim();
-
-  // Basic URL validation
-  const urlPattern = /^https?:\/\//;
-  if (form && !urlPattern.test(form)) { toast('Invalid Form URL','error'); return; }
-  if (guesses && !urlPattern.test(guesses)) { toast('Invalid Guesses CSV URL','error'); return; }
-  if (matches && !urlPattern.test(matches)) { toast('Invalid Matches CSV URL','error'); return; }
-  if (results && !urlPattern.test(results)) { toast('Invalid Results CSV URL','error'); return; }
-
-  localStorage.setItem('bwc_form', form);
-  localStorage.setItem('bwc_guesses', guesses);
-  localStorage.setItem('bwc_matches', matches);
-  localStorage.setItem('bwc_results', results);
-  toast('Configuration saved!');
-  updateFormEmbed();
-  loadCSVData();
-}
-
-const DEFAULT_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSd4DvC69yk6Rn8sd5r3QbfELDlQXtve32LgZmJDVui9uAMFsg/viewform?embedded=true';
-
-function updateFormEmbed() {
-  const url = localStorage.getItem('bwc_form') || DEFAULT_FORM_URL;
+  // embed the Google Form
   const container = document.getElementById('form-container');
-  if (url) {
-    if (!url.includes('docs.google.com/forms')) {
-      container.innerHTML = `<div id="form-placeholder" class="p-12 text-center text-gray-500"><i class="fas fa-exclamation-triangle text-4xl mb-3 block text-yellow-500"></i><p>URL doesn't appear to be a Google Form</p></div>`;
-      return;
-    }
-    container.innerHTML = `<iframe src="${encodeURI(url)}" width="100%" height="3015" frameborder="0" marginheight="0" marginwidth="0" class="bg-white rounded-b-xl">Loading…</iframe>`;
-  }
+  container.innerHTML = `<iframe src="${encodeURI(FORM_URL)}" width="100%" height="3015" frameborder="0" marginheight="0" marginwidth="0" class="bg-white rounded-b-xl">Loading…</iframe>`;
 }
 
 // ===== CSV LOADING =====
-const DEFAULT_GUESSES_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSRTjdA_AfuoG2SanAA7eeIgV0okELU5mUMaoF9VDxBh395Q9b7D8ec9hjtlNk0QTjxSldG090F8WgA/pub?output=csv';
-
 // Column name matchers — maps your Google Form headers to internal keys
 function classifyColumn(header) {
   const h = header.trim().toLowerCase();
@@ -392,87 +327,71 @@ function classifyColumn(header) {
 }
 
 function loadCSVData() {
-  const guessesUrl = localStorage.getItem('bwc_guesses') || DEFAULT_GUESSES_URL;
-  const resultsUrl = localStorage.getItem('bwc_results');
-
-  if (guessesUrl) {
-    Papa.parse(guessesUrl, {
-      download: true, header: true, skipEmptyLines: true,
-      complete: r => {
-        // Build column mapping from actual headers
-        const colMap = {};
-        if (r.meta && r.meta.fields) {
-          for (const f of r.meta.fields) {
-            const mapped = classifyColumn(f);
-            if (mapped) colMap[f] = mapped;
-          }
+  // Employee guesses
+  Papa.parse(GUESSES_CSV, {
+    download: true, header: true, skipEmptyLines: true,
+    complete: r => {
+      const colMap = {};
+      if (r.meta && r.meta.fields) {
+        for (const f of r.meta.fields) {
+          const mapped = classifyColumn(f);
+          if (mapped) colMap[f] = mapped;
         }
-        employees = r.data.map(row => {
-          const obj = {};
-          for (const [rawCol, key] of Object.entries(colMap)) {
-            const val = (row[rawCol]||'').trim();
-            obj[key] = key === 'ChampionPick' ? sanitizePick(val) : val;
-          }
-          return obj;
-        }).filter(e => e.Name);
-        renderLeaderboard();
-      },
-      error: () => { employees = []; renderLeaderboard(); }
-    });
-  } else {
-    employees = [];
-  }
+      }
+      employees = r.data.map(row => {
+        const obj = {};
+        for (const [rawCol, key] of Object.entries(colMap)) {
+          const val = (row[rawCol]||'').trim();
+          obj[key] = key === 'ChampionPick' ? sanitizePick(val) : val;
+        }
+        return obj;
+      }).filter(e => e.Name);
+      renderLeaderboard();
+    },
+    error: () => { employees = []; renderLeaderboard(); }
+  });
 
-  // Group Matches CSV
-  const matchesUrl = localStorage.getItem('bwc_matches');
-  if (matchesUrl) {
-    Papa.parse(matchesUrl, {
-      download: true, header: true, skipEmptyLines: true,
-      complete: r => {
-        groupScores = r.data.map(row => {
-          const obj = {};
-          for (const k of Object.keys(row)) {
-            const lk = k.trim().toLowerCase();
-            if (lk === 'group') obj.group = (row[k]||'').trim().toUpperCase();
-            else if (lk === 'team1') obj.team1 = (row[k]||'').trim();
-            else if (lk === 'score1') obj.score1 = (row[k]||'').trim();
-            else if (lk === 'team2') obj.team2 = (row[k]||'').trim();
-            else if (lk === 'score2') obj.score2 = (row[k]||'').trim();
-            else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();
-          }
-          return obj;
-        }).filter(m => m.team1 && m.team2);
-        renderGroups();
-      },
-      error: () => { groupScores = []; }
-    });
-  } else {
-    groupScores = [];
-  }
+  // Group Matches
+  Papa.parse(MATCHES_CSV, {
+    download: true, header: true, skipEmptyLines: true,
+    complete: r => {
+      groupScores = r.data.map(row => {
+        const obj = {};
+        for (const k of Object.keys(row)) {
+          const lk = k.trim().toLowerCase();
+          if (lk === 'group') obj.group = (row[k]||'').trim().toUpperCase();
+          else if (lk === 'team1') obj.team1 = (row[k]||'').trim();
+          else if (lk === 'score1') obj.score1 = (row[k]||'').trim();
+          else if (lk === 'team2') obj.team2 = (row[k]||'').trim();
+          else if (lk === 'score2') obj.score2 = (row[k]||'').trim();
+          else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();
+        }
+        return obj;
+      }).filter(m => m.team1 && m.team2);
+      renderGroups();
+    },
+    error: () => { groupScores = []; }
+  });
 
-  // Knockout Results CSV
-  if (resultsUrl) {
-    Papa.parse(resultsUrl, {
-      download: true, header: true, skipEmptyLines: true,
-      complete: r => {
-        realResults = {};
-        r.data.forEach(row => {
-          let sk='', tn='';
-          for (const k of Object.keys(row)) {
-            const lk = k.trim().toLowerCase();
-            if (lk==='stagekey') sk = row[k].trim().toLowerCase();
-            else if (lk==='teamname') tn = row[k].trim();
-          }
-          if (sk && tn) realResults[sk] = tn;
-        });
-        renderBracket();
-        renderLeaderboard();
-      },
-      error: () => { realResults = {}; renderBracket(); }
-    });
-  } else {
-    realResults = {};
-  }
+  // Knockout Results
+  Papa.parse(RESULTS_CSV, {
+    download: true, header: true, skipEmptyLines: true,
+    complete: r => {
+      realResults = {};
+      r.data.forEach(row => {
+        let sk='', tn='';
+        for (const k of Object.keys(row)) {
+          const lk = k.trim().toLowerCase();
+          if (lk==='stagekey') sk = row[k].trim().toLowerCase();
+          else if (lk==='teamname') tn = row[k].trim();
+        }
+        if (sk && tn) realResults[sk] = tn;
+      });
+      renderBracket();
+      renderLeaderboard();
+    },
+    error: () => { realResults = {}; renderBracket(); }
+  });
 }
 
 // ===== POINTS =====
@@ -580,14 +499,12 @@ function renderBracket() {
   const root = document.getElementById('bracket-root');
   const info = document.getElementById('bracket-info');
 
-  // Info bar: show data source status
-  const resultsUrl = localStorage.getItem('bwc_results');
-  if (!resultsUrl) {
-    info.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-1"></i>No Knockout Results CSV configured — go to <strong>Setup</strong> to add one. All results will show TBD.';
-  } else if (Object.keys(res).length === 0) {
-    info.innerHTML = '<i class="fas fa-clock text-gray-500 mr-1"></i>Results CSV configured but no data yet — tournament starts June 11.';
+  // Info bar
+  const nRes = Object.keys(res).length;
+  if (nRes === 0) {
+    info.innerHTML = '<i class="fas fa-clock text-gray-500 mr-1"></i>No knockout results yet — data loads automatically from the Google Sheet. Tournament starts June 11.';
   } else {
-    info.innerHTML = '<i class="fas fa-check-circle text-green-400 mr-1"></i>Showing live results from your Google Sheet. Refresh the page to fetch latest.';
+    info.innerHTML = `<i class="fas fa-check-circle text-green-400 mr-1"></i>Showing live results (${nRes} entries). Auto-refreshes every 3 min.`;
   }
 
   function slot(team) {
@@ -721,6 +638,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderGroups();
   loadCSVData();
   setTimeout(() => { renderBracket(); renderLeaderboard(); }, 500);
+  // Auto-refresh data from Google Sheet
+  setInterval(loadCSVData, REFRESH_MS);
 });
 </script>
 </body>
