@@ -364,7 +364,9 @@ function loadCSVData() {
           else if (lk === 'score1') obj.score1 = (row[k]||'').trim();
           else if (lk === 'team2') obj.team2 = (row[k]||'').trim();
           else if (lk === 'score2') obj.score2 = (row[k]||'').trim();
-          else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();            else if (lk === 'datetime') obj.datetime = (row[k]||'').trim();        }
+          else if (lk === 'status') obj.status = (row[k]||'').trim().toLowerCase();
+          else if (lk === 'datetime' || (lk === '' && !obj.datetime)) obj.datetime = (row[k]||'').trim();
+          }
         return obj;
       }).filter(m => m.team1 && m.team2);
       renderGroups();
